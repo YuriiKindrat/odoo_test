@@ -10,4 +10,5 @@ class DummyA(models.Model):
     active = fields.Boolean(default=True)
     sequence = fields.Integer(default=10)
     priority = fields.Selection([('0', 'Normal'), ('1', 'High')], default='0')
+    color = fields.Integer(default=0)
     notes = fields.Text()
