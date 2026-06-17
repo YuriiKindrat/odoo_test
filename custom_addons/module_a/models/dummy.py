@@ -6,3 +6,4 @@ class DummyA(models.Model):
     _description = 'Dummy Model A'
 
     name = fields.Char()
+    description = fields.Text()
