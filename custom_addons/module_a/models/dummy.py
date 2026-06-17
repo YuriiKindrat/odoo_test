@@ -7,4 +7,6 @@ class DummyA(models.Model):
 
     name = fields.Char()
     description = fields.Text()
+<<<<<<< HEAD
     active = fields.Boolean(default=True)
+    sequence = fields.Integer(default=10)
