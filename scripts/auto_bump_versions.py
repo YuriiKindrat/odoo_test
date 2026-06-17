@@ -65,20 +65,12 @@ def write_manifest_version(module, new_version):
     manifest_path.write_text(updated)
 
 
-def get_new_migration_folders(module):
-    migrations_path = CUSTOM_ADDONS / module / "migrations"
-    if not migrations_path.exists():
-        return set()
+MIGRATION_PLACEHOLDER = "current_version"
 
-    current = {d.name for d in migrations_path.iterdir() if d.is_dir()}
 
-    result = git("ls-tree", "--name-only", "HEAD~1", str(migrations_path) + "/")
-    previous = (
-        {Path(e).name for e in result.stdout.strip().splitlines()}
-        if result.returncode == 0 and result.stdout.strip()
-        else set()
-    )
-    return current - previous
+def has_placeholder_migration(module):
+    placeholder = CUSTOM_ADDONS / module / "migrations" / MIGRATION_PLACEHOLDER
+    return placeholder.is_dir()
 
 
 def process_module(module):
@@ -89,15 +81,11 @@ def process_module(module):
 
     new_version = bump_version(base_version)
 
-    new_folders = get_new_migration_folders(module)
-    if new_folders:
-        migrations_path = CUSTOM_ADDONS / module / "migrations"
-        for folder_name in new_folders:
-            old_path = migrations_path / folder_name
-            new_path = migrations_path / new_version
-            if old_path != new_path:
-                old_path.rename(new_path)
-                print(f"  {module}: renamed migration {folder_name} -> {new_version}")
+    if has_placeholder_migration(module):
+        old_path = CUSTOM_ADDONS / module / "migrations" / MIGRATION_PLACEHOLDER
+        new_path = CUSTOM_ADDONS / module / "migrations" / new_version
+        old_path.rename(new_path)
+        print(f"  {module}: renamed migration {MIGRATION_PLACEHOLDER} -> {new_version}")
 
     write_manifest_version(module, new_version)
     print(f"  {module}: {base_version} -> {new_version}")
