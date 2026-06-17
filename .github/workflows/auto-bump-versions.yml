@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: auto-bump
+  cancel-in-progress: false
+
 jobs:
   bump-versions:
     runs-on: ubuntu-latest
