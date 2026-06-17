@@ -7,6 +7,6 @@ class DummyA(models.Model):
 
     name = fields.Char()
     description = fields.Text()
-<<<<<<< HEAD
     active = fields.Boolean(default=True)
     sequence = fields.Integer(default=10)
+    priority = fields.Selection([('0', 'Normal'), ('1', 'High')], default='0')
