@@ -1,0 +1,30 @@
+name: Auto Bump Module Versions
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  bump-versions:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip-bump]')"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run version bump script
+        run: python scripts/auto_bump_versions.py
