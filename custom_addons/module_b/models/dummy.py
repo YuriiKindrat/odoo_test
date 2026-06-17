@@ -6,3 +6,4 @@ class DummyB(models.Model):
     _description = 'Dummy Model B'
 
     name = fields.Char()
+    active = fields.Boolean(default=True)
