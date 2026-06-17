@@ -7,3 +7,4 @@ class DummyA(models.Model):
 
     name = fields.Char()
     description = fields.Text()
+    active = fields.Boolean(default=True)
