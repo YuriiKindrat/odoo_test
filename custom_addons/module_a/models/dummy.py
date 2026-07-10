@@ -14,3 +14,4 @@ class DummyA(models.Model):
     tag_ids = fields.Many2many('res.partner.category')
 
 
+
