@@ -1,4 +1,15 @@
 #!/usr/bin/env python3
+"""Auto-bump Odoo module versions on push to feature/bug/fix branches.
+
+Compares each changed module's version against develop. If the PR branch
+version is not ahead of develop, bumps it to develop_version + 1.
+If a migration folder named "current_version" exists, renames it to the
+new version as well.
+
+Usage:
+    python3 scripts/auto_bump_versions.py
+"""
+
 import ast
 import re
 import subprocess
@@ -7,13 +18,15 @@ from pathlib import Path
 
 CUSTOM_ADDONS = Path("custom_addons")
 EXCLUDE_DIRS = {"tests", "i18n"}
+MIGRATION_PLACEHOLDER = "current_version"
+BASE_BRANCH = "origin/develop"
 
 
-def git(*args):
+def git(*args) -> subprocess.CompletedProcess:
     return subprocess.run(["git", *args], capture_output=True, text=True)
 
 
-def git_check(*args):
+def git_check(*args) -> str:
     result = git(*args)
     if result.returncode != 0:
         print(f"git {' '.join(args)} failed: {result.stderr}", file=sys.stderr)
@@ -21,8 +34,12 @@ def git_check(*args):
     return result.stdout.strip()
 
 
-def get_changed_modules():
-    diff = git_check("diff", "HEAD~1..HEAD", "--name-only")
+def version_tuple(version: str) -> tuple:
+    return tuple(int(x) for x in version.split("."))
+
+
+def get_changed_modules() -> set[str]:
+    diff = git_check("diff", f"{BASE_BRANCH}...HEAD", "--name-only")
     if not diff:
         return set()
 
@@ -40,76 +57,80 @@ def get_changed_modules():
     return modules
 
 
-def read_version_at_head1(module):
+def read_version_on_develop(module: str) -> str | None:
     manifest_path = CUSTOM_ADDONS / module / "__manifest__.py"
-    result = git("show", f"HEAD~1:{manifest_path}")
+    result = git("show", f"{BASE_BRANCH}:{manifest_path}")
     if result.returncode != 0:
         return None
     return ast.literal_eval(result.stdout).get("version")
 
 
-def bump_version(version):
+def read_current_version(module: str) -> str | None:
+    manifest_path = CUSTOM_ADDONS / module / "__manifest__.py"
+    if not manifest_path.exists():
+        return None
+    return ast.literal_eval(manifest_path.read_text()).get("version")
+
+
+def bump_version(version: str) -> str:
     parts = version.split(".")
     parts[-1] = str(int(parts[-1]) + 1)
     return ".".join(parts)
 
 
-def write_manifest_version(module, new_version):
+def write_manifest_version(module: str, new_version: str) -> None:
     manifest_path = CUSTOM_ADDONS / module / "__manifest__.py"
     content = manifest_path.read_text()
     updated = re.sub(
-        r"(['\"]version['\"]:\s*['\"])[^'\"]+(['\"])",
+        r'([\'"]version[\'"]\s*:\s*[\'"])[^\'"]+([\'"])',
         lambda m: f"{m.group(1)}{new_version}{m.group(2)}",
         content,
     )
     manifest_path.write_text(updated)
 
 
-MIGRATION_PLACEHOLDER = "current_version"
-
-
-def has_placeholder_migration(module):
+def has_placeholder_migration(module: str) -> bool:
     placeholder = CUSTOM_ADDONS / module / "migrations" / MIGRATION_PLACEHOLDER
     return placeholder.is_dir()
 
 
-def process_module(module):
-    base_version = read_version_at_head1(module)
-    if base_version is None:
-        print(f"  {module}: not found in HEAD~1, skipping")
+def process_module(module: str) -> None:
+    develop_version = read_version_on_develop(module)
+    if develop_version is None:
+        print(f"  {module}: not found in develop, skipping")
         return
 
-    new_version = bump_version(base_version)
+    current_version = read_current_version(module)
+    if current_version is None:
+        print(f"  {module}: manifest not found locally, skipping")
+        return
+
+    if version_tuple(current_version) > version_tuple(develop_version):
+        print(f"  {module}: already bumped ({current_version} > {develop_version}), skipping")
+        return
+
+    new_version = bump_version(develop_version)
 
     if has_placeholder_migration(module):
         old_path = CUSTOM_ADDONS / module / "migrations" / MIGRATION_PLACEHOLDER
         new_path = CUSTOM_ADDONS / module / "migrations" / new_version
         old_path.rename(new_path)
-        print(f"  {module}: renamed migration {MIGRATION_PLACEHOLDER} -> {new_version}")
+        print(f"  {module}: renamed migrations/{MIGRATION_PLACEHOLDER}/ -> migrations/{new_version}/")
 
     write_manifest_version(module, new_version)
-    print(f"  {module}: {base_version} -> {new_version}")
+    print(f"  {module}: {current_version} -> {new_version} (develop: {develop_version})")
 
 
-def main():
+def main() -> None:
     modules = get_changed_modules()
     if not modules:
         print("No relevant module changes detected.")
         return
 
-    print(f"Bumping: {', '.join(sorted(modules))}")
+    print(f"Checking: {', '.join(sorted(modules))}")
     for module in sorted(modules):
         process_module(module)
 
-    git_check("add", str(CUSTOM_ADDONS))
-
-    if subprocess.run(["git", "diff", "--cached", "--quiet"]).returncode == 0:
-        print("Nothing to commit.")
-        return
-
-    git_check("commit", "-m", "auto: bump module versions [skip-bump]")
-    git_check("pull", "--rebase")
-    git_check("push")
     print("Done.")
 
 
