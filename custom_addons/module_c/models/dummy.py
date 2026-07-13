@@ -6,5 +6,6 @@ class DummyC(models.Model):
     _description = 'Dummy Model C'
 
     name = fields.Char()
+    sequence = fields.Integer(default=10)
     active = fields.Boolean(default=True)
     description = fields.Text()
