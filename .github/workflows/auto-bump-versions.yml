@@ -75,6 +75,14 @@ jobs:
           else
             git add custom_addons/
             git commit -m "auto: bump module versions [skip-bump]"
-            git pull --rebase origin ${{ github.ref_name }}
-            git push origin ${{ github.ref_name }}
+
+            if git merge --no-commit --no-ff origin/develop; then
+              git merge --abort 2>/dev/null || true
+              git pull --rebase origin ${{ github.ref_name }}
+              git push origin ${{ github.ref_name }}
+            else
+              git merge --abort 2>/dev/null || true
+              echo "Bump would conflict with develop (branch is behind on this module), reverting. Update this branch with develop and push again."
+              git reset --hard HEAD~1
+            fi
           fi
