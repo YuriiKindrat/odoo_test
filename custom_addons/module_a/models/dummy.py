@@ -13,5 +13,6 @@ class DummyA(models.Model):
     color = fields.Integer(default=0)
     tag_ids = fields.Many2many('res.partner.category')
 
-    # branch A marker
+    # branch B marker
+
 
