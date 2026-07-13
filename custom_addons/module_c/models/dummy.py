@@ -9,3 +9,4 @@ class DummyC(models.Model):
     active = fields.Boolean(default=True)
     description = fields.Text()
 
+
