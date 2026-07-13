@@ -7,3 +7,4 @@ class DummyC(models.Model):
 
     name = fields.Char()
     active = fields.Boolean(default=True)
+    description = fields.Text()
