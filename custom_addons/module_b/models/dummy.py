@@ -8,3 +8,4 @@ class DummyB(models.Model):
     name = fields.Char()
     active = fields.Boolean(default=True)
     notes = fields.Text()
+

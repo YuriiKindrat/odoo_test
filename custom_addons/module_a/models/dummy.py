@@ -12,5 +12,3 @@ class DummyA(models.Model):
     priority = fields.Selection([('0', 'Normal'), ('1', 'High')], default='0')
     color = fields.Integer(default=0)
     tag_ids = fields.Many2many('res.partner.category')
-
-    # scenario 2 branch marker
