@@ -9,3 +9,4 @@ class DummyC(models.Model):
     color = fields.Integer(default=0)
     active = fields.Boolean(default=True)
     description = fields.Text()
+
