@@ -1,5 +1,5 @@
 {
     'name': 'Module A',
-    'version': '0.1.20',
+    'version': '0.1.22',
     'depends': ['base'],
 }
