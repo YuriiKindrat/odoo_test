@@ -94,6 +94,16 @@ def has_placeholder_migration(module: str) -> bool:
     return placeholder.is_dir()
 
 
+def migration_folder_exists_locally(module: str, version: str) -> bool:
+    return (CUSTOM_ADDONS / module / "migrations" / version).is_dir()
+
+
+def migration_folder_exists_on_develop(module: str, version: str) -> bool:
+    path = f"{CUSTOM_ADDONS}/{module}/migrations/{version}"
+    result = git("ls-tree", BASE_BRANCH, path)
+    return bool(result.stdout.strip())
+
+
 def process_module(module: str) -> None:
     develop_version = read_version_on_develop(module)
     if develop_version is None:
@@ -111,11 +121,23 @@ def process_module(module: str) -> None:
 
     new_version = bump_version(develop_version)
 
+    migrations_dir = CUSTOM_ADDONS / module / "migrations"
     if has_placeholder_migration(module):
-        old_path = CUSTOM_ADDONS / module / "migrations" / MIGRATION_PLACEHOLDER
-        new_path = CUSTOM_ADDONS / module / "migrations" / new_version
+        old_path = migrations_dir / MIGRATION_PLACEHOLDER
+        new_path = migrations_dir / new_version
         old_path.rename(new_path)
         print(f"  {module}: renamed migrations/{MIGRATION_PLACEHOLDER}/ -> migrations/{new_version}/")
+    elif (
+        migration_folder_exists_locally(module, develop_version)
+        and not migration_folder_exists_on_develop(module, develop_version)
+    ):
+        # Race condition: current_version/ was already renamed to develop_version/ by a
+        # previous auto-bump that ran before another branch claimed the same version.
+        # Since this folder is not in develop, it belongs to this branch — rename it.
+        old_path = migrations_dir / develop_version
+        new_path = migrations_dir / new_version
+        old_path.rename(new_path)
+        print(f"  {module}: renamed migrations/{develop_version}/ -> migrations/{new_version}/ (race condition recovery)")
 
     write_manifest_version(module, new_version)
     print(f"  {module}: {current_version} -> {new_version} (develop: {develop_version})")
