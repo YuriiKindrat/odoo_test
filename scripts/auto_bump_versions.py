@@ -145,7 +145,7 @@ def process_module(module: str) -> None:
         # develop_version/ folder from develop so it is not deleted on merge.
         old_path = migrations_dir / develop_version
         new_path = migrations_dir / new_version
-        shutil.copytree(str(old_path), str(new_path))
+        shutil.copytree(str(old_path), str(new_path), dirs_exist_ok=True)
         git_check("checkout", BASE_BRANCH, "--", str(old_path))
         print(f"  {module}: created migrations/{new_version}/ and restored migrations/{develop_version}/ from develop (race condition recovery)")
     elif migration_folder_exists_locally(module, current_version):
@@ -156,7 +156,7 @@ def process_module(module: str) -> None:
         new_path = migrations_dir / new_version
         if migration_folder_differs_from_develop(module, current_version):
             # Develop also has this version folder with different content → copy + restore
-            shutil.copytree(str(old_path), str(new_path))
+            shutil.copytree(str(old_path), str(new_path), dirs_exist_ok=True)
             git_check("checkout", BASE_BRANCH, "--", str(old_path))
         else:
             # Only on this branch (develop has no such folder) → simple rename
