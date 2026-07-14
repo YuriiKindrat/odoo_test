@@ -123,6 +123,8 @@ def process_module(module: str) -> None:
 
     if version_tuple(current_version) > version_tuple(develop_version):
         print(f"  {module}: already bumped ({current_version} > {develop_version}), skipping")
+        if has_placeholder_migration(module):
+            print(f"  {module}: WARNING - migrations/{MIGRATION_PLACEHOLDER}/ still exists, rename it to migrations/{current_version}/ manually")
         return
 
     new_version = bump_version(develop_version)
