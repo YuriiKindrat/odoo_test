@@ -12,6 +12,7 @@ Usage:
 
 import ast
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -137,12 +138,14 @@ def process_module(module: str) -> None:
         and migration_folder_differs_from_develop(module, develop_version)
     ):
         # Race condition: current_version/ was already renamed to develop_version/ by a
-        # previous auto-bump that ran before another branch claimed the same version.
-        # Since this folder is not in develop, it belongs to this branch — rename it.
+        # previous auto-bump, but another branch claimed the same version first.
+        # Copy our migration content to the new version folder, then restore the
+        # develop_version/ folder from develop so it is not deleted on merge.
         old_path = migrations_dir / develop_version
         new_path = migrations_dir / new_version
-        old_path.rename(new_path)
-        print(f"  {module}: renamed migrations/{develop_version}/ -> migrations/{new_version}/ (race condition recovery)")
+        shutil.copytree(str(old_path), str(new_path))
+        git_check("checkout", BASE_BRANCH, "--", str(old_path))
+        print(f"  {module}: created migrations/{new_version}/ and restored migrations/{develop_version}/ from develop (race condition recovery)")
 
     write_manifest_version(module, new_version)
     print(f"  {module}: {current_version} -> {new_version} (develop: {develop_version})")
