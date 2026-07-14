@@ -146,6 +146,20 @@ def process_module(module: str) -> None:
         shutil.copytree(str(old_path), str(new_path))
         git_check("checkout", BASE_BRANCH, "--", str(old_path))
         print(f"  {module}: created migrations/{new_version}/ and restored migrations/{develop_version}/ from develop (race condition recovery)")
+    elif migration_folder_exists_locally(module, current_version):
+        # Develop moved ahead while this branch was open: current_version/ was already
+        # renamed to current_version (e.g. 0.1.18/) by a previous auto-bump, but now
+        # develop is at a higher version (e.g. 0.1.23) so we need to move it forward.
+        old_path = migrations_dir / current_version
+        new_path = migrations_dir / new_version
+        if migration_folder_differs_from_develop(module, current_version):
+            # Develop also has this version folder with different content → copy + restore
+            shutil.copytree(str(old_path), str(new_path))
+            git_check("checkout", BASE_BRANCH, "--", str(old_path))
+        else:
+            # Only on this branch (develop has no such folder) → simple rename
+            old_path.rename(new_path)
+        print(f"  {module}: migration folder moved migrations/{current_version}/ -> migrations/{new_version}/")
 
     write_manifest_version(module, new_version)
     print(f"  {module}: {current_version} -> {new_version} (develop: {develop_version})")
