@@ -98,10 +98,15 @@ def migration_folder_exists_locally(module: str, version: str) -> bool:
     return (CUSTOM_ADDONS / module / "migrations" / version).is_dir()
 
 
-def migration_folder_exists_on_develop(module: str, version: str) -> bool:
+def migration_folder_differs_from_develop(module: str, version: str) -> bool:
     path = f"{CUSTOM_ADDONS}/{module}/migrations/{version}"
-    result = git("ls-tree", BASE_BRANCH, path)
-    return bool(result.stdout.strip())
+    develop_result = git("ls-tree", BASE_BRANCH, path)
+    local_result = git("ls-tree", "HEAD", path)
+    if not develop_result.stdout.strip() or not local_result.stdout.strip():
+        return False
+    develop_sha = develop_result.stdout.split()[2]
+    local_sha = local_result.stdout.split()[2]
+    return develop_sha != local_sha
 
 
 def process_module(module: str) -> None:
@@ -129,7 +134,7 @@ def process_module(module: str) -> None:
         print(f"  {module}: renamed migrations/{MIGRATION_PLACEHOLDER}/ -> migrations/{new_version}/")
     elif (
         migration_folder_exists_locally(module, develop_version)
-        and not migration_folder_exists_on_develop(module, develop_version)
+        and migration_folder_differs_from_develop(module, develop_version)
     ):
         # Race condition: current_version/ was already renamed to develop_version/ by a
         # previous auto-bump that ran before another branch claimed the same version.
