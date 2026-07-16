@@ -98,6 +98,12 @@ def migration_folder_exists_locally(module: str, version: str) -> bool:
     return (CUSTOM_ADDONS / module / "migrations" / version).is_dir()
 
 
+def migration_folder_exists_in_develop(module: str, version: str) -> bool:
+    path = f"{CUSTOM_ADDONS}/{module}/migrations/{version}"
+    result = git("ls-tree", BASE_BRANCH, path)
+    return bool(result.stdout.strip())
+
+
 def migration_folder_differs_from_develop(module: str, version: str) -> bool:
     path = f"{CUSTOM_ADDONS}/{module}/migrations/{version}"
     develop_result = git("ls-tree", BASE_BRANCH, path)
@@ -151,10 +157,12 @@ def process_module(module: str) -> None:
             # Develop also has this version folder with different content → copy + restore
             shutil.copytree(str(old_path), str(new_path), dirs_exist_ok=True)
             git_check("checkout", BASE_BRANCH, "--", str(old_path))
-        else:
-            # Only on this branch (develop has no such folder) → simple rename
+            print(f"  {module}: migration folder moved migrations/{current_version}/ -> migrations/{new_version}/")
+        elif not migration_folder_exists_in_develop(module, current_version):
+            # Folder only on this branch → safe rename
             old_path.rename(new_path)
-        print(f"  {module}: migration folder moved migrations/{current_version}/ -> migrations/{new_version}/")
+            print(f"  {module}: migration folder moved migrations/{current_version}/ -> migrations/{new_version}/")
+        # else: same content as develop = historical migration from develop, skip
 
     write_manifest_version(module, new_version)
     print(f"  {module}: {current_version} -> {new_version} (develop: {develop_version})")
