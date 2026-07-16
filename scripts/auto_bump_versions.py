@@ -3,8 +3,13 @@
 
 Compares each changed module's version against develop. If the PR branch
 version is not ahead of develop, bumps it to develop_version + 1.
-If a migration folder named "current_version" exists, renames it to the
-new version as well.
+
+Migration folder convention:
+  Developers place migration scripts in migrations/{develop_version}/ —
+  the version the module is currently at in develop. For example, if develop
+  is at 0.1.22, create migrations/0.1.22/pre-migrate.py. This allows
+  migrations to run locally during development. The script renames the folder
+  to the new bumped version (e.g. 0.1.23/) automatically on push.
 
 Usage:
     python3 scripts/auto_bump_versions.py
@@ -19,7 +24,6 @@ from pathlib import Path
 
 CUSTOM_ADDONS = Path("custom_addons")
 EXCLUDE_DIRS = {"tests", "i18n"}
-MIGRATION_PLACEHOLDER = "current_version"
 BASE_BRANCH = "origin/develop"
 
 
@@ -90,11 +94,6 @@ def write_manifest_version(module: str, new_version: str) -> None:
     manifest_path.write_text(updated)
 
 
-def has_placeholder_migration(module: str) -> bool:
-    placeholder = CUSTOM_ADDONS / module / "migrations" / MIGRATION_PLACEHOLDER
-    return placeholder.is_dir()
-
-
 def migration_folder_exists_locally(module: str, version: str) -> bool:
     return (CUSTOM_ADDONS / module / "migrations" / version).is_dir()
 
@@ -123,19 +122,12 @@ def process_module(module: str) -> None:
 
     if version_tuple(current_version) > version_tuple(develop_version):
         print(f"  {module}: already bumped ({current_version} > {develop_version}), skipping")
-        if has_placeholder_migration(module):
-            print(f"  {module}: WARNING - migrations/{MIGRATION_PLACEHOLDER}/ still exists, rename it to migrations/{current_version}/ manually")
         return
 
     new_version = bump_version(develop_version)
 
     migrations_dir = CUSTOM_ADDONS / module / "migrations"
-    if has_placeholder_migration(module):
-        old_path = migrations_dir / MIGRATION_PLACEHOLDER
-        new_path = migrations_dir / new_version
-        old_path.rename(new_path)
-        print(f"  {module}: renamed migrations/{MIGRATION_PLACEHOLDER}/ -> migrations/{new_version}/")
-    elif (
+    if (
         migration_folder_exists_locally(module, develop_version)
         and migration_folder_differs_from_develop(module, develop_version)
     ):
@@ -149,9 +141,10 @@ def process_module(module: str) -> None:
         git_check("checkout", BASE_BRANCH, "--", str(old_path))
         print(f"  {module}: created migrations/{new_version}/ and restored migrations/{develop_version}/ from develop (race condition recovery)")
     elif migration_folder_exists_locally(module, current_version):
-        # Develop moved ahead while this branch was open: current_version/ was already
-        # renamed to current_version (e.g. 0.1.18/) by a previous auto-bump, but now
-        # develop is at a higher version (e.g. 0.1.23) so we need to move it forward.
+        # Two cases:
+        # 1. Normal: developer created migrations/{develop_version}/ directly.
+        # 2. Develop moved ahead: a previous auto-bump already renamed the folder
+        #    to {current_version}/ but develop has since moved further ahead.
         old_path = migrations_dir / current_version
         new_path = migrations_dir / new_version
         if migration_folder_differs_from_develop(module, current_version):
