@@ -127,10 +127,10 @@ def process_module(module: str) -> None:
         return
 
     if version_tuple(current_version) > version_tuple(develop_version):
-        print(f"  {module}: already bumped ({current_version} > {develop_version}), skipping")
-        return
-
-    new_version = bump_version(develop_version)
+        print(f"  {module}: already bumped ({current_version} > {develop_version}), checking migrations only")
+        new_version = current_version
+    else:
+        new_version = bump_version(develop_version)
 
     migrations_dir = CUSTOM_ADDONS / module / "migrations"
     if (
