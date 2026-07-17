@@ -127,10 +127,10 @@ def process_module(module: str) -> None:
         return
 
     if version_tuple(current_version) > version_tuple(develop_version):
-        print(f"  {module}: already bumped ({current_version} > {develop_version}), skipping")
-        return
-
-    new_version = bump_version(develop_version)
+        print(f"  {module}: already bumped ({current_version} > {develop_version}), checking migrations only")
+        new_version = current_version
+    else:
+        new_version = bump_version(develop_version)
 
     migrations_dir = CUSTOM_ADDONS / module / "migrations"
     if (
@@ -146,7 +146,7 @@ def process_module(module: str) -> None:
         shutil.copytree(str(old_path), str(new_path), dirs_exist_ok=True)
         git_check("checkout", BASE_BRANCH, "--", str(old_path))
         print(f"  {module}: created migrations/{new_version}/ and restored migrations/{develop_version}/ from develop (race condition recovery)")
-    elif migration_folder_exists_locally(module, current_version):
+    elif migration_folder_exists_locally(module, current_version) and current_version != new_version:
         # Two cases:
         # 1. Normal: developer created migrations/{develop_version}/ directly.
         # 2. Develop moved ahead: a previous auto-bump already renamed the folder
@@ -163,6 +163,24 @@ def process_module(module: str) -> None:
             old_path.rename(new_path)
             print(f"  {module}: migration folder moved migrations/{current_version}/ -> migrations/{new_version}/")
         # else: same content as develop = historical migration from develop, skip
+
+    # Scan all migration folders for any that differ from develop but weren't caught above.
+    # This handles the case where a developer kept their migration content when resolving
+    # a merge conflict (e.g. branch was at 0.1.27, develop moved to 0.1.28 via another PR,
+    # developer resolved conflict keeping their 0.1.27/ content — script now looks for 0.1.28/
+    # and misses the modified 0.1.27/).
+    if migrations_dir.exists():
+        new_path = migrations_dir / new_version
+        for folder in sorted(migrations_dir.iterdir()):
+            if not folder.is_dir() or folder.name == new_version:
+                continue
+            version = folder.name
+            if (migration_folder_exists_in_develop(module, version)
+                    and migration_folder_differs_from_develop(module, version)):
+                shutil.copytree(str(folder), str(new_path), dirs_exist_ok=True)
+                git_check("checkout", BASE_BRANCH, "--", str(folder))
+                print(f"  {module}: recovered modified migration {version}/ -> migrations/{new_version}/ (restored {version}/ from develop)")
+                break
 
     write_manifest_version(module, new_version)
     print(f"  {module}: {current_version} -> {new_version} (develop: {develop_version})")

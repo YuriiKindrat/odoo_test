@@ -77,7 +77,7 @@ jobs:
         id: commit
         if: steps.check.outputs.skip != 'true' && steps.conflict.outputs.conflict != 'true'
         run: |
-          if git diff --quiet; then
+          if [ -z "$(git status --porcelain custom_addons/)" ]; then
             echo "Nothing to commit."
           else
             git add custom_addons/
