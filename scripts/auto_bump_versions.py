@@ -133,6 +133,7 @@ def process_module(module: str) -> None:
         new_version = bump_version(develop_version)
 
     migrations_dir = CUSTOM_ADDONS / module / "migrations"
+    handled_migration_version = None
     if (
         migration_folder_exists_locally(module, develop_version)
         and migration_folder_differs_from_develop(module, develop_version)
@@ -145,6 +146,7 @@ def process_module(module: str) -> None:
         new_path = migrations_dir / new_version
         shutil.copytree(str(old_path), str(new_path), dirs_exist_ok=True)
         git_check("checkout", BASE_BRANCH, "--", str(old_path))
+        handled_migration_version = develop_version
         print(f"  {module}: created migrations/{new_version}/ and restored migrations/{develop_version}/ from develop (race condition recovery)")
     elif migration_folder_exists_locally(module, current_version) and current_version != new_version:
         # Two cases:
@@ -157,10 +159,12 @@ def process_module(module: str) -> None:
             # Develop also has this version folder with different content → copy + restore
             shutil.copytree(str(old_path), str(new_path), dirs_exist_ok=True)
             git_check("checkout", BASE_BRANCH, "--", str(old_path))
+            handled_migration_version = current_version
             print(f"  {module}: migration folder moved migrations/{current_version}/ -> migrations/{new_version}/")
         elif not migration_folder_exists_in_develop(module, current_version):
             # Folder only on this branch → safe rename
             old_path.rename(new_path)
+            handled_migration_version = current_version
             print(f"  {module}: migration folder moved migrations/{current_version}/ -> migrations/{new_version}/")
         # else: same content as develop = historical migration from develop, skip
 
@@ -174,6 +178,8 @@ def process_module(module: str) -> None:
         for folder in sorted(migrations_dir.iterdir()):
             if not folder.is_dir() or folder.name == new_version:
                 continue
+            if folder.name == handled_migration_version:
+                continue  # already handled by main logic above
             version = folder.name
             if (migration_folder_exists_in_develop(module, version)
                     and migration_folder_differs_from_develop(module, version)):
