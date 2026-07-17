@@ -146,7 +146,7 @@ def process_module(module: str) -> None:
         shutil.copytree(str(old_path), str(new_path), dirs_exist_ok=True)
         git_check("checkout", BASE_BRANCH, "--", str(old_path))
         print(f"  {module}: created migrations/{new_version}/ and restored migrations/{develop_version}/ from develop (race condition recovery)")
-    elif migration_folder_exists_locally(module, current_version):
+    elif migration_folder_exists_locally(module, current_version) and current_version != new_version:
         # Two cases:
         # 1. Normal: developer created migrations/{develop_version}/ directly.
         # 2. Develop moved ahead: a previous auto-bump already renamed the folder
